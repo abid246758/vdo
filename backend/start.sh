@@ -19,7 +19,6 @@ check_port 3000
 check_port 9000
 
 echo "📦 Starting Backend Server..."
-cd backend
 npm start &
 BACKEND_PID=$!
 
