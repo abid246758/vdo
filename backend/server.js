@@ -1,7 +1,7 @@
 const express = require('express');
 const http = require('http');
-const cors = require('cors');
 const path = require('path');
+const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { Server } = require('socket.io');
@@ -38,8 +38,8 @@ app.use(limiter);
 
 // CORS configuration - optimized for mobile
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? ['https://yourdomain.com', 'https://www.yourdomain.com'] 
+  origin: process.env.NODE_ENV === 'production'
+    ? ['https://yourdomain.com', 'https://www.yourdomain.com']
     : ['http://localhost:3000', 'http://localhost:3001', 'http://127.0.0.1:3000'],
   credentials: true,
   methods: ['GET', 'POST', 'OPTIONS'],
@@ -56,8 +56,8 @@ const server = http.createServer(app);
 // Socket.io configuration - optimized for mobile
 const io = new Server(server, {
   cors: {
-    origin: process.env.NODE_ENV === 'production' 
-      ? ['https://yourdomain.com', 'https://www.yourdomain.com'] 
+    origin: process.env.NODE_ENV === 'production'
+      ? ['https://yourdomain.com', 'https://www.yourdomain.com']
       : ['http://localhost:3000', 'http://localhost:3001', 'http://127.0.0.1:3000'],
     methods: ['GET', 'POST', 'OPTIONS'],
     credentials: true
@@ -88,7 +88,7 @@ const generateRoomCode = () => {
 
 io.on('connection', (socket) => {
   console.log(`👤 User connected: ${socket.id}`);
-  
+
   // Store user connection
   activeUsers.set(socket.id, {
     id: socket.id,
@@ -111,7 +111,7 @@ io.on('connection', (socket) => {
   // Handle create room - simplified for mobile
   socket.on('createRoom', ({ name }) => {
     console.log(`🏠 ${name} (${socket.id}) creating room`);
-    
+
     // Generate a simple 6-character code
     let roomCode;
     let attempts = 0;
@@ -119,7 +119,7 @@ io.on('connection', (socket) => {
       roomCode = generateRoomCode();
       attempts++;
     } while (activeRooms.has(roomCode) && attempts < 10);
-    
+
     if (attempts >= 10) {
       socket.emit('roomError', { message: 'Unable to generate room code. Please try again.' });
       return;
@@ -135,23 +135,23 @@ io.on('connection', (socket) => {
       createdBy: socket.id,
       createdByName: name
     };
-    
+
     activeRooms.set(roomCode, room);
     socket.join(roomCode);
-    
+
     // Clear any existing timer for this room
     if (roomTimers.has(roomCode)) {
       clearTimeout(roomTimers.get(roomCode));
       roomTimers.delete(roomCode);
     }
-    
+
     // Update user's room
     if (activeUsers.has(socket.id)) {
       activeUsers.get(socket.id).roomId = roomCode;
     }
-    
-    socket.emit('roomCreated', { 
-      roomId: roomCode, 
+
+    socket.emit('roomCreated', {
+      roomId: roomCode,
       roomCode: roomCode,
       message: 'Room created successfully',
       shareUrl: `${process.env.CLIENT_URL || 'http://localhost:3000'}?room=${roomCode}`
@@ -162,13 +162,13 @@ io.on('connection', (socket) => {
   // Handle join room - improved for mobile
   socket.on('joinRoom', ({ roomCode, name }) => {
     console.log(`🚪 ${name} (${socket.id}) attempting to join room: ${roomCode}`);
-    
+
     // Normalize room code (uppercase, trim)
     const normalizedCode = roomCode.toUpperCase().trim();
-    
+
     if (!activeRooms.has(normalizedCode)) {
       console.log(`❌ Room ${normalizedCode} does not exist. Available rooms:`, Array.from(activeRooms.keys()));
-      socket.emit('roomError', { 
+      socket.emit('roomError', {
         message: 'Room code not found. Please check the code and try again.',
         code: 'ROOM_NOT_FOUND'
       });
@@ -176,9 +176,9 @@ io.on('connection', (socket) => {
     }
 
     const room = activeRooms.get(normalizedCode);
-    
+
     if (room.users.length >= room.maxUsers) {
-      socket.emit('roomError', { 
+      socket.emit('roomError', {
         message: 'Room is full (maximum 2 people)',
         code: 'ROOM_FULL'
       });
@@ -188,43 +188,43 @@ io.on('connection', (socket) => {
     // Join room
     room.users.push(socket.id);
     socket.join(normalizedCode);
-    
+
     // Clear any existing timer for this room (room is now active with 2 users)
     if (roomTimers.has(normalizedCode)) {
       clearTimeout(roomTimers.get(normalizedCode));
       roomTimers.delete(normalizedCode);
     }
-    
+
     // Update user's room
     if (activeUsers.has(socket.id)) {
       activeUsers.get(socket.id).roomId = normalizedCode;
     }
-    
+
     // Notify existing user in room
-    socket.to(normalizedCode).emit('userJoined', { 
-      userId: socket.id, 
+    socket.to(normalizedCode).emit('userJoined', {
+      userId: socket.id,
       name,
       message: `${name} joined the room`,
       roomCode: normalizedCode
     });
-    
-    socket.emit('roomJoined', { 
+
+    socket.emit('roomJoined', {
       roomId: normalizedCode,
       roomCode: normalizedCode,
       message: 'Successfully joined room',
       otherUser: room.users.length > 1 ? room.users.find(id => id !== socket.id) : null,
       createdBy: room.createdByName
     });
-    
+
     console.log(`✅ ${socket.id} joined room ${normalizedCode}. Users: ${room.users.length}/2`);
   });
 
   // Handle call initiation (when both users are in room)
   socket.on('callUser', ({ userToCall, signalData, from, name }) => {
     console.log(`📞 ${name} (${from}) calling ${userToCall}`);
-    io.to(userToCall).emit('callUser', { 
-      signal: signalData, 
-      from, 
+    io.to(userToCall).emit('callUser', {
+      signal: signalData,
+      from,
       name,
       callerId: from
     });
@@ -245,7 +245,7 @@ io.on('connection', (socket) => {
   // Handle call end
   socket.on('endCall', ({ to }) => {
     console.log(`📴 ${socket.id} ending call with ${to}`);
-    
+
     if (to) {
       io.to(to).emit('callEnded');
     }
@@ -254,23 +254,23 @@ io.on('connection', (socket) => {
   // Handle screen sharing events
   socket.on('screenShareStarted', ({ from, name, roomId }) => {
     console.log(`🖥️ ${name} (${from}) started screen sharing in room ${roomId}`);
-    
+
     // Notify other users in the room
-    socket.to(roomId).emit('screenShareStarted', { 
-      from, 
+    socket.to(roomId).emit('screenShareStarted', {
+      from,
       name,
-      roomId 
+      roomId
     });
   });
 
   socket.on('screenShareStopped', ({ from, name, roomId }) => {
     console.log(`🖥️ ${name} (${from}) stopped screen sharing in room ${roomId}`);
-    
+
     // Notify other users in the room
-    socket.to(roomId).emit('screenShareStopped', { 
-      from, 
+    socket.to(roomId).emit('screenShareStopped', {
+      from,
       name,
-      roomId 
+      roomId
     });
   });
 
@@ -282,20 +282,20 @@ io.on('connection', (socket) => {
   // Handle disconnect
   socket.on('disconnect', () => {
     console.log(`👋 User disconnected: ${socket.id}`);
-    
+
     const user = activeUsers.get(socket.id);
     if (user && user.roomId) {
       const room = activeRooms.get(user.roomId);
       if (room) {
         // Remove user from room
         room.users = room.users.filter(id => id !== socket.id);
-        
+
         // Notify other user in room
-        socket.to(user.roomId).emit('userLeft', { 
-          userId: socket.id, 
-          message: 'User left the room' 
+        socket.to(user.roomId).emit('userLeft', {
+          userId: socket.id,
+          message: 'User left the room'
         });
-        
+
         // If room becomes empty, delete it immediately
         if (room.users.length === 0) {
           console.log(`🗑️ Room ${user.roomId} deleted (empty)`);
@@ -303,43 +303,43 @@ io.on('connection', (socket) => {
         } else if (room.users.length === 1) {
           // If only 1 user left, set a timer to expire the room after 2 minutes (mobile users need more time)
           console.log(`⏰ Room ${user.roomId} will expire in 2 minutes (1 user left)`);
-          
+
           // Clear any existing timer
           if (roomTimers.has(user.roomId)) {
             clearTimeout(roomTimers.get(user.roomId));
           }
-          
+
           // Set a timer to expire the room
           const timer = setTimeout(() => {
             const currentRoom = activeRooms.get(user.roomId);
             if (currentRoom && currentRoom.users.length === 1) {
               console.log(`🗑️ Room ${user.roomId} expired after timeout`);
-              
+
               // Notify remaining user that room expired
-              io.to(currentRoom.users[0]).emit('roomExpired', { 
+              io.to(currentRoom.users[0]).emit('roomExpired', {
                 message: 'Room expired due to inactivity. Please create a new room.',
                 roomCode: user.roomId
               });
-              
+
               // Delete room and timer
               activeRooms.delete(user.roomId);
               roomTimers.delete(user.roomId);
             }
           }, 120000); // 2 minutes delay for mobile users
-          
+
           roomTimers.set(user.roomId, timer);
         }
       }
     }
-    
+
     activeUsers.delete(socket.id);
   });
 });
 
 // Health check endpoint - mobile optimized
 app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
+  res.json({
+    status: 'OK',
     timestamp: new Date().toISOString(),
     activeUsers: activeUsers.size,
     activeRooms: activeRooms.size,
@@ -358,7 +358,7 @@ app.get('/health', (req, res) => {
 
 // Get active rooms - mobile optimized
 app.get('/api/rooms', (req, res) => {
-  res.json({ 
+  res.json({
     rooms: Array.from(activeRooms.values()).map(room => ({
       id: room.id,
       code: room.code,
@@ -395,13 +395,19 @@ app.get('/manifest.json', (req, res) => {
   });
 });
 
-// Serve static files in production
-if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '../frontend/build')));
-  
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../frontend/build', 'index.html'));
-  });
+// Serve static files in production (only if frontend build exists)
+if (process.env.NODE_ENV === 'production' && process.env.SERVE_FRONTEND === 'true') {
+  const fs = require('fs');
+  const frontendPath = path.join(__dirname, '../frontend/build');
+
+  // Only serve frontend if build directory exists
+  if (fs.existsSync(frontendPath)) {
+    app.use(express.static(frontendPath));
+
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(frontendPath, 'index.html'));
+    });
+  }
 }
 
 const PORT = process.env.PORT || 4001;
